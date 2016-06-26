@@ -11,17 +11,17 @@
 
 	//This is the main plugin definition
 	$.fn.ghostHunter 	= function( options ) {
-	 
+
 	 	//Here we use jQuery's extend to set default values if they weren't set by the user
-	    var opts 		= $.extend( {}, $.fn.ghostHunter.defaults, options );
-	    if( opts.results ) 
-    	{
-    		pluginMethods.init( this , opts );
-    		return pluginMethods;
-    	}
+			var opts 		= $.extend( {}, $.fn.ghostHunter.defaults, options );
+			if( opts.results )
+			{
+				pluginMethods.init( this , opts );
+				return pluginMethods;
+			}
 
 	};
-	 
+
 	$.fn.ghostHunter.defaults = {
 		results 			: false,
 		onKeyUp 			: false,
@@ -30,6 +30,7 @@
 		displaySearchInfo 	: true,
 		zeroResultsInfo		: true,
 		before 				: false,
+		lunr						: false,
 		onComplete 			: false
 	};
 
@@ -52,19 +53,24 @@
 			this.result_template 	= opts.result_template;
 			this.info_template 		= opts.info_template;
 			this.zeroResultsInfo 	= opts.zeroResultsInfo;
-			this.displaySearchInfo  = opts.displaySearchInfo;
+			this.displaySearchInfo	= opts.displaySearchInfo;
 			this.before 			= opts.before;
+			this.lunr					= opts.lunr;
 			this.onComplete 		= opts.onComplete;
 
 			//This is where we'll build the index for later searching. It's not a big deal to build it on every load as it takes almost no space without data
-			this.index = lunr(function () {
-			    this.field('title', {boost: 10})
-			    this.field('description')
-			    this.field('link')
-			    this.field('markdown', {boost: 5})
-			    this.field('pubDate')
-			    this.field('tag')
-			    this.ref('id')
+			this.index = lunr(function (idx) {
+					// lunr inject settings
+					if (that.lunr && that.lunr.call(this, idx)) {
+						return;
+					}
+					this.field('title', {boost: 10})
+					this.field('description')
+					this.field('link')
+					this.field('markdown', {boost: 5})
+					this.field('pubDate')
+					this.field('tag')
+					this.ref('id')
 			});
 
 			target.focus(function(){
@@ -87,27 +93,27 @@
 		},
 
 		loadAPI			: function(){
-			
+
 			if(this.isInit) return false;
 
-		/*	Here we load all of the blog posts to the index. 
-			This function will not call on load to avoid unnecessary heavy 
+		/*	Here we load all of the blog posts to the index.
+			This function will not call on load to avoid unnecessary heavy
 			operations on a page if a visitor never ends up searching anything. */
-			
+
 			var index 		= this.index,
 				blogData 	= this.blogData;
 
-	        $.get(ghost.url.api('posts', {limit: "all", include: "tags"})).done(function(data){
-	        	searchData = data.posts;
-            	searchData.forEach(function(arrayItem){
-            		var tag_arr = arrayItem.tags.map(function(v) {
-	    			return v.name; // `tag` object has an `name` property which is the value of tag. If you also want other info, check API and get that property
-	    			})
-	    			var category = tag_arr.join(", ");
-	    			if (category.length < 1){
-	    			category = "undefined";
+					$.get(ghost.url.api('posts', {limit: "all", include: "tags"})).done(function(data){
+						searchData = data.posts;
+							searchData.forEach(function(arrayItem){
+								var tag_arr = arrayItem.tags.map(function(v) {
+						return v.name; // `tag` object has an `name` property which is the value of tag. If you also want other info, check API and get that property
+						})
+						var category = tag_arr.join(", ");
+						if (category.length < 1){
+						category = "undefined";
 					}
-			        var parsedData 	= {
+							var parsedData 	= {
 						id 			: String(arrayItem.id),
 						title 		: String(arrayItem.title),
 						description	: String(arrayItem.meta_description),
@@ -116,13 +122,13 @@
 						tag 		: category,
 						link 		: String(arrayItem.url)
 					}
-					
+
 					parsedData.prettyPubDate = prettyDate(parsedData.pubDate);
 					var tempdate = prettyDate(parsedData.pubDate);
 
-				    index.add(parsedData)
-				    blogData[arrayItem.id] = {title: arrayItem.title, description: arrayItem.meta_description, pubDate: tempdate, link: arrayItem.url};
-            		});
+						index.add(parsedData)
+						blogData[arrayItem.id] = {title: arrayItem.title, description: arrayItem.meta_description, pubDate: tempdate, link: arrayItem.url};
+								});
 
 			});
 
@@ -148,7 +154,7 @@
 			for (var i = 0; i < searchResult.length; i++)
 			{
 				var lunrref		= searchResult[i].ref;
-				var postData  	= this.blogData[lunrref];
+				var postData		= this.blogData[lunrref];
 				results.append(this.format(this.result_template,postData));
 				resultsData.push(postData);
 			}
@@ -164,10 +170,10 @@
 		},
 
 		format 			: function (t, d) {
-	        return t.replace(/{{([^{}]*)}}/g, function (a, b) {
-	            var r = d[b];
-	            return typeof r === 'string' || typeof r === 'number' ? r : a;
-	        });
+					return t.replace(/{{([^{}]*)}}/g, function (a, b) {
+							var r = d[b];
+							return typeof r === 'string' || typeof r === 'number' ? r : a;
+					});
 		}
 	}
 
